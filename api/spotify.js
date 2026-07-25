@@ -1,11 +1,13 @@
 import axios from "axios";
 
 export default async function handler(req, res) {
-  // Allow GitHub Pages / other sites
+  // Allow external websites (GitHub Pages, etc.)
   res.setHeader("Access-Control-Allow-Origin", "*");
 
+  res.setHeader("Access-Control-Allow-Methods", "GET");
+
   try {
-    // Get access token
+    // Get Spotify access token
     const tokenResponse = await axios.post(
       "https://accounts.spotify.com/api/token",
 
@@ -31,12 +33,16 @@ export default async function handler(req, res) {
 
     const accessToken = tokenResponse.data.access_token;
 
-    // CURRENT SONG
+    // ==========================
+    // CURRENTLY PLAYING
+    // ==========================
+
     let current = null;
 
     try {
       const currentResponse = await axios.get(
         "https://api.spotify.com/v1/me/player/currently-playing",
+
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -53,16 +59,24 @@ export default async function handler(req, res) {
           album: currentResponse.data.item.album.images[0].url,
 
           is_playing: currentResponse.data.is_playing,
+
+          progress_ms: currentResponse.data.progress_ms,
+
+          duration_ms: currentResponse.data.item.duration_ms,
         };
       }
     } catch (error) {
-      // 204 = nothing playing
+      // Spotify returns 204 if nothing is playing
       current = null;
     }
 
-    // HISTORY
+    // ==========================
+    // RECENTLY PLAYED HISTORY
+    // ==========================
+
     const historyResponse = await axios.get(
       "https://api.spotify.com/v1/me/player/recently-played",
+
       {
         params: {
           limit: 20,
@@ -80,10 +94,14 @@ export default async function handler(req, res) {
       artist: item.track.artists[0].name,
 
       album: item.track.album.images[0].url,
+
+      played_at: item.played_at,
     }));
 
+    // Send clean JSON
     res.status(200).json({
       current,
+
       history,
     });
   } catch (error) {
